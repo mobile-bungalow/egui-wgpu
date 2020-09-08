@@ -1,12 +1,12 @@
 use wgpu::{include_spirv, Device, ShaderModule};
 
 pub fn load_vert(dev: &Device) -> ShaderModule {
-    let src = include_spirv!("vert.sprv");
+    let src = include_spirv!("vert.spv");
     dev.create_shader_module(src)
 }
 
 pub fn load_frag(dev: &Device) -> ShaderModule {
-    let src = include_spirv!("frag.sprv");
+    let src = include_spirv!("frag.spv");
     dev.create_shader_module(src)
 }
 
