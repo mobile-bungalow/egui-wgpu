@@ -1,4 +1,21 @@
-use wgpu::{include_spirv, Device, ShaderModule};
+use wgpu::{
+    include_spirv, // BindGroupLayoutDescriptor,
+    Device,
+    ProgrammableStageDescriptor,
+    ShaderModule,
+};
+
+//const DESC: BindGroupLayoutDescriptor = BindGroupLayoutDescriptor {
+//    label: Some("egui-wgpu :: bind_group_descriptor"),
+//};
+
+/// creates a shader stage with entry point main from a shader module.
+pub fn default_mod<'a>(module: &'a ShaderModule) -> ProgrammableStageDescriptor<'a> {
+    ProgrammableStageDescriptor {
+        module,
+        entry_point: "main",
+    }
+}
 
 pub fn load_vert(dev: &Device) -> ShaderModule {
     let src = include_spirv!("vert.spv");
