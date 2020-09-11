@@ -42,7 +42,7 @@ mod test {
         .unwrap();
         let (device, _) =
             block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None)).unwrap();
-        load_vert(&device);
+        let _ = load_vert(&device);
     }
 
     #[test]
@@ -55,6 +55,6 @@ mod test {
         .unwrap();
         let (device, _) =
             block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None)).unwrap();
-        load_frag(&device);
+        let _ = load_frag(&device);
     }
 }
