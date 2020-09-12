@@ -76,7 +76,7 @@ fn main() {
     .expect("Failed to create device");
 
     let ui_state = UI;
-    let mut egui_renderer = EguiRenderer::new(&device, ui_state, FMT);
+    let mut egui_renderer = EguiRenderer::new(&device, &queue, ui_state, FMT);
     egui_renderer.set_width(size.width as f32);
     egui_renderer.set_height(size.height as f32);
 

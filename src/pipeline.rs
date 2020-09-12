@@ -1,26 +1,26 @@
-use std::{mem::size_of, num::NonZeroU64};
-use wgpu::{
-    vertex_attr_array, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Device, IndexFormat, InputStepMode, PipelineLayout,
-    PipelineLayoutDescriptor, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor,
-    ShaderStage, TextureComponentType, TextureFormat, TextureViewDimension, VertexBufferDescriptor,
-    VertexStateDescriptor,
+use std::{
+    mem::size_of,
+    num::{NonZeroU32, NonZeroU64},
 };
+use wgpu::*;
 
 use crate::{default_mod, load_frag, load_vert};
 
 pub struct Pipeline {
-    pl: RenderPipeline,
-    // vert_bg: BindGroup,
-    // frag_bg: BindGroup
+    pub pl: RenderPipeline,
+    pub vert_bg: BindGroup,
+    pub frag_bg: BindGroup,
+    pub egui_tex: Texture,
+    pub vert_uniform_buf: Buffer,
+    pub tex_hash: u64,
 }
 
 impl Pipeline {
-    pub fn new(dev: &Device, fmt: TextureFormat) -> Self {
+    pub fn new(dev: &Device, q: &Queue, tex: &egui::paint::Texture, fmt: TextureFormat) -> Self {
         // TODO: put these in const position with an updated version of the
         // layout macro
         let vert_layout = dev.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("egui-wgpu :: vert_bgl"),
+            label: Some("egui-wgpu :: vert_bind_group_layout"),
             entries: &[BindGroupLayoutEntry {
                 visibility: ShaderStage::VERTEX,
                 binding: 0,
@@ -32,8 +32,24 @@ impl Pipeline {
             }],
         });
 
+        let vert_uniform_buf = dev.create_buffer(&BufferDescriptor {
+            label: Some("egui-wgpu :: vertex_uniform_buffer"),
+            size: size_of::<[f32; 4]>() as u64,
+            usage: BufferUsage::UNIFORM,
+            mapped_at_creation: false,
+        });
+
+        let vert_bg = dev.create_bind_group(&BindGroupDescriptor {
+            label: Some("egui-wgpu :: vert_bind_group"),
+            layout: &vert_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::Buffer(vert_uniform_buf.slice(..)),
+            }],
+        });
+
         let frag_layout = dev.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("egui-wgpu :: frag_bgl"),
+            label: Some("egui-wgpu :: frag_bind_group_layout"),
             entries: &[
                 BindGroupLayoutEntry {
                     visibility: ShaderStage::FRAGMENT,
@@ -54,11 +70,80 @@ impl Pipeline {
             ],
         });
 
+        let egui_tex = dev.create_texture(&TextureDescriptor {
+            label: Some("egui-wgpu :: main_texture"),
+            size: wgpu::Extent3d {
+                height: tex.height as u32,
+                width: tex.width as u32,
+                depth: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Uint,
+            usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
+        });
+
+        let egui_sampler = dev.create_sampler(&SamplerDescriptor {
+            label: Some("egui-wgpu :: main_sampler"),
+            ..Default::default()
+        });
+
+        let frag_bg = dev.create_bind_group(&BindGroupDescriptor {
+            label: Some("egui-wgpu :: frag_bind_group"),
+            layout: &frag_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::Sampler(&egui_sampler),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(&egui_tex.create_view(
+                        &TextureViewDescriptor {
+                            label: Some("egui-wgpu :: main_texture_view"),
+                            dimension: Some(TextureViewDimension::D2),
+                            format: Some(fmt),
+                            aspect: TextureAspect::All,
+                            base_mip_level: 0,
+                            level_count: NonZeroU32::new(1),
+                            base_array_layer: 0,
+                            array_layer_count: NonZeroU32::new(1),
+                        },
+                    )),
+                },
+            ],
+        });
+
         let pl_layout = dev.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("egui-wgpu :: render_pl_layout"),
             bind_group_layouts: &[&vert_layout, &frag_layout],
             push_constant_ranges: &[],
         });
+
+        let pixels = tex.pixels.iter().fold(Vec::<u8>::new(), |mut vec, byte| {
+            vec.extend(&[*byte; 4]);
+            vec
+        });
+
+        q.write_texture(
+            wgpu::TextureCopyView {
+                texture: &egui_tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            &pixels,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: tex.width as u32 * 4,
+                rows_per_image: tex.height as u32,
+            },
+            wgpu::Extent3d {
+                width: tex.width as u32,
+                height: tex.height as u32,
+                depth: 1,
+            },
+        );
 
         //TODO: when desc and state are available to be put in const
         // position again do so.
@@ -88,11 +173,35 @@ impl Pipeline {
             alpha_to_coverage_enabled: false,
         });
 
-        Self { pl }
+        Self {
+            pl,
+            frag_bg,
+            vert_bg,
+            vert_uniform_buf,
+            egui_tex,
+            tex_hash: tex.id,
+        }
     }
 
-    pub fn inner(&self) -> &RenderPipeline {
-        &self.pl
+    pub fn rebuild_texture(&mut self, queue: &Queue, tex: &egui::paint::Texture) {
+        queue.write_texture(
+            wgpu::TextureCopyView {
+                texture: &self.egui_tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            &tex.pixels,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: tex.width as u32 * 3,
+                rows_per_image: tex.height as u32,
+            },
+            wgpu::Extent3d {
+                width: tex.width as u32,
+                height: tex.height as u32,
+                depth: 1,
+            },
+        );
     }
 }
 
@@ -109,9 +218,9 @@ mod test {
             compatible_surface: None,
         }))
         .unwrap();
-        let (device, _) =
+        let (d, q) =
             block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None)).unwrap();
 
-        let _ = Pipeline::new(&device, TextureFormat::Rgba8UnormSrgb);
+        // let _ = Pipeline::new(&device, TextureFormat::Rgba8UnormSrgb);
     }
 }

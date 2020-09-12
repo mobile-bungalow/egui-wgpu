@@ -7,24 +7,11 @@
 mod pipeline;
 mod shaders;
 
-use egui::{
-    math::clamp,
-    paint::tessellator::{PaintJob, PaintJobs},
-    pos2, vec2, Context, RawInput, Texture, Ui,
-};
+use egui::{pos2, vec2, Context, RawInput, Ui};
 use pipeline::*;
 use shaders::*;
 use std::sync::Arc;
 use wgpu::*;
-
-/// Vertex struct
-#[derive(Clone, Copy, Debug, Default)]
-#[repr(C)]
-struct V {
-    pub p: [f32; 2], // position
-    pub u: [u16; 2], // texture coordinates
-    pub c: [u8; 4],  // color in SRGB8 format
-}
 
 /// All events you pass to the UI state should be
 /// convertable to this type.
@@ -55,12 +42,16 @@ where
     S: UiState,
 {
     /// fmt should be the same format that you render EGui to.
-    pub fn new(dev: &Device, state: S, fmt: TextureFormat) -> Self {
+    pub fn new(dev: &Device, queue: &Queue, state: S, fmt: TextureFormat) -> Self {
+        let mut ctx = Context::new();
+        let raw_input = RawInput::default();
+        let _ = ctx.begin_frame(raw_input);
+        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt);
         Self {
-            ui_pl: Pipeline::new(dev, fmt),
-            raw_input: RawInput::default(),
-            ctx: Context::new(),
+            ui_pl,
+            ctx,
             state,
+            raw_input: RawInput::default(),
             start_time: std::time::Instant::now(),
         }
     }
@@ -83,10 +74,12 @@ where
 
     pub fn set_height(&mut self, h: f32) {
         self.raw_input.screen_size.y = h;
+        //TODO: set texture height in buffer
     }
 
     pub fn set_width(&mut self, w: f32) {
         self.raw_input.screen_size.x = w;
+        //TODO: set texutre width in buffer
     }
 
     pub fn dpi(&mut self, dpi: f32) {
@@ -100,6 +93,6 @@ where
         self.state.draw(&mut ui);
         let (out, jobs) = self.ctx.end_frame();
 
-        rpass.set_pipeline(self.ui_pl.inner());
+        rpass.set_pipeline(&self.ui_pl.pl);
     }
 }
