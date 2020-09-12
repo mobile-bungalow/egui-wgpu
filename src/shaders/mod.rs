@@ -5,10 +5,6 @@ use wgpu::{
     ShaderModule,
 };
 
-//const DESC: BindGroupLayoutDescriptor = BindGroupLayoutDescriptor {
-//    label: Some("egui-wgpu :: bind_group_descriptor"),
-//};
-
 /// creates a shader stage with entry point main from a shader module.
 pub fn default_mod<'a>(module: &'a ShaderModule) -> ProgrammableStageDescriptor<'a> {
     ProgrammableStageDescriptor {

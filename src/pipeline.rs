@@ -103,12 +103,7 @@ impl Pipeline {
                         &TextureViewDescriptor {
                             label: Some("egui-wgpu :: main_texture_view"),
                             dimension: Some(TextureViewDimension::D2),
-                            format: Some(fmt),
-                            aspect: TextureAspect::All,
-                            base_mip_level: 0,
-                            level_count: NonZeroU32::new(1),
-                            base_array_layer: 0,
-                            array_layer_count: NonZeroU32::new(1),
+                            ..Default::default()
                         },
                     )),
                 },
@@ -193,7 +188,7 @@ impl Pipeline {
             &tex.pixels,
             wgpu::TextureDataLayout {
                 offset: 0,
-                bytes_per_row: tex.width as u32 * 3,
+                bytes_per_row: tex.width as u32 * 4,
                 rows_per_image: tex.height as u32,
             },
             wgpu::Extent3d {
@@ -202,25 +197,5 @@ impl Pipeline {
                 depth: 1,
             },
         );
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use futures::executor::block_on;
-
-    #[test]
-    pub fn pipeline_runs() {
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
-        let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: None,
-        }))
-        .unwrap();
-        let (d, q) =
-            block_on(adapter.request_device(&wgpu::DeviceDescriptor::default(), None)).unwrap();
-
-        // let _ = Pipeline::new(&device, TextureFormat::Rgba8UnormSrgb);
     }
 }
