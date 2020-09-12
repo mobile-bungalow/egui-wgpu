@@ -34,6 +34,7 @@ pub enum EventBridge {
     MouseUp,
     Resize { w: f32, h: f32 },
     DpiChanged(f32),
+    Ignore,
 }
 
 pub trait UiState {
@@ -41,17 +42,20 @@ pub trait UiState {
     fn draw(&self, ui: &mut Ui);
 }
 
-pub struct EguiRenderer {
+pub struct EguiRenderer<S: UiState> {
     ui_pl: Pipeline,
     raw_input: RawInput,
     ctx: Arc<Context>,
-    state: Box<dyn UiState>,
+    state: S,
     start_time: std::time::Instant,
 }
 
-impl EguiRenderer {
+impl<S> EguiRenderer<S>
+where
+    S: UiState,
+{
     /// fmt should be the same format that you render EGui to.
-    pub fn new(dev: &Device, state: Box<dyn UiState>, fmt: TextureFormat) -> Self {
+    pub fn new(dev: &Device, state: S, fmt: TextureFormat) -> Self {
         Self {
             ui_pl: Pipeline::new(dev, fmt),
             raw_input: RawInput::default(),
@@ -70,6 +74,7 @@ impl EguiRenderer {
             EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x, y)),
             EventBridge::Resize { w, h } => self.raw_input.screen_size = vec2(w, h),
             EventBridge::DpiChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
+            _ => {}
         }
     }
 
