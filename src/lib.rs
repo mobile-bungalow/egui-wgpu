@@ -66,7 +66,10 @@ where
     }
 
     /// this should be called in a loop in immediate mode
-    pub fn consume_event<T: Into<EventBridge>>(&mut self, input: T) {
+    pub fn consume_event<'a, T>(&mut self, input: T)
+    where
+        T: Into<EventBridge>,
+    {
         self.raw_input.time = self.start_time.elapsed().as_nanos() as f64 * 1e-9;
         match input.into() {
             EventBridge::MouseUp => self.raw_input.mouse_down = false,

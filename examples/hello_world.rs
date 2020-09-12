@@ -7,15 +7,15 @@ use winit::{
 };
 
 const FMT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
-struct EventWrapper<'a>(Event<'a, ()>);
+struct EventWrapper<'a, 'b>(&'b Event<'a, ()>);
 
-impl<'a> Into<EventBridge> for EventWrapper<'a> {
+impl<'a, 'b> Into<EventBridge> for EventWrapper<'a, 'b> {
     fn into(self) -> EventBridge {
         match self.0 {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(PhysicalSize { width, height }) => EventBridge::Resize {
-                    w: width as f32,
-                    h: height as f32,
+                    w: *width as f32,
+                    h: *height as f32,
                 },
                 WindowEvent::CursorMoved { position: p, .. } => EventBridge::MouseMove {
                     x: p.x as f32,
@@ -26,7 +26,7 @@ impl<'a> Into<EventBridge> for EventWrapper<'a> {
                     ElementState::Released => EventBridge::MouseUp,
                 },
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                    EventBridge::DpiChanged(scale_factor as f32)
+                    EventBridge::DpiChanged(*scale_factor as f32)
                 }
                 _ => EventBridge::Ignore,
             },
@@ -35,6 +35,7 @@ impl<'a> Into<EventBridge> for EventWrapper<'a> {
     }
 }
 
+#[derive(Copy, Clone)]
 struct UI;
 
 impl UiState for UI {
@@ -64,7 +65,7 @@ fn main() {
         .expect("Failed to find an appropiate adapter");
 
     // Create the logical device and command queue
-    let (device, _queue) = futures::executor::block_on(adapter.request_device(
+    let (device, queue) = futures::executor::block_on(adapter.request_device(
         &wgpu::DeviceDescriptor {
             features: wgpu::Features::empty(),
             limits: wgpu::Limits::default(),
@@ -75,15 +76,12 @@ fn main() {
     .expect("Failed to create device");
 
     let ui_state = UI;
-    let egui_renderer = EguiRenderer::new(&device, ui_state, FMT);
+    let mut egui_renderer = EguiRenderer::new(&device, ui_state, FMT);
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
+        egui_renderer.consume_event(EventWrapper(&event));
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::Resized(_size),
-                ..
-            } => {}
+            Event::WindowEvent { .. } => {}
             Event::RedrawRequested(_) => {}
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
