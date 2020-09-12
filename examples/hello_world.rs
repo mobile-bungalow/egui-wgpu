@@ -6,7 +6,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
 };
 
-const FMT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
+const FMT: TextureFormat = TextureFormat::Bgra8UnormSrgb;
 struct EventWrapper<'a, 'b>(&'b Event<'a, ()>);
 
 impl<'a, 'b> Into<EventBridge> for EventWrapper<'a, 'b> {
@@ -77,12 +77,56 @@ fn main() {
 
     let ui_state = UI;
     let mut egui_renderer = EguiRenderer::new(&device, ui_state, FMT);
+    egui_renderer.set_width(size.width as f32);
+    egui_renderer.set_height(size.height as f32);
+
+    let mut sc_desc = wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        format: FMT,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Mailbox,
+    };
+
+    let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
     event_loop.run(move |event, _, control_flow| {
         egui_renderer.consume_event(EventWrapper(&event));
         match event {
-            Event::WindowEvent { .. } => {}
-            Event::RedrawRequested(_) => {}
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                // Recreate the swap chain with the new size
+                sc_desc.width = size.width;
+                sc_desc.height = size.height;
+                swap_chain = device.create_swap_chain(&surface, &sc_desc);
+            }
+            Event::RedrawRequested(_) => {
+                let frame = swap_chain
+                    .get_current_frame()
+                    .expect("Swap Chain Failed")
+                    .output;
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("egui-wgpu :: ui encoder"),
+                });
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: true,
+                            },
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+                    egui_renderer.draw_on(&mut rpass);
+                }
+
+                queue.submit(Some(encoder.finish()));
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..

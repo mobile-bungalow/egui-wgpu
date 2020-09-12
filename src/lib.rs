@@ -94,7 +94,7 @@ where
     }
 
     /// Draws the UI using `render_pass`.
-    pub fn draw_on<'a>(&'a mut self, rpass: &'a mut RenderPass<'a>) {
+    pub fn draw_on<'a>(&'a mut self, rpass: &mut RenderPass<'a>) {
         // render the scene
         let mut ui = self.ctx.begin_frame(self.raw_input.take());
         self.state.draw(&mut ui);
