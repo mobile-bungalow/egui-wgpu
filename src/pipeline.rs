@@ -1,7 +1,4 @@
-use std::{
-    mem::size_of,
-    num::{NonZeroU32, NonZeroU64},
-};
+use std::{mem::size_of, num::NonZeroU64};
 use wgpu::*;
 
 use crate::{default_mod, load_frag, load_vert};
@@ -12,6 +9,8 @@ pub struct Pipeline {
     pub frag_bg: BindGroup,
     pub egui_tex: Texture,
     pub vert_uniform_buf: Buffer,
+    pub vert_buf: Buffer,
+    pub idx_buf: Buffer,
     pub tex_hash: u64,
 }
 
@@ -39,6 +38,19 @@ impl Pipeline {
             mapped_at_creation: false,
         });
 
+        let vert_buf = dev.create_buffer(&BufferDescriptor {
+            label: Some("egui-wgpu :: vertex_buffer "),
+            size: size_of::<egui::paint::Vertex>() as u64 * 1024,
+            usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let idx_buf = dev.create_buffer(&BufferDescriptor {
+            label: Some("egui-wgpu :: index_buffer "),
+            size: size_of::<u32>() as u64 * 3072,
+            usage: BufferUsage::INDEX | BufferUsage::COPY_DST,
+            mapped_at_creation: false,
+        });
         let vert_bg = dev.create_bind_group(&BindGroupDescriptor {
             label: Some("egui-wgpu :: vert_bind_group"),
             layout: &vert_layout,
@@ -173,6 +185,8 @@ impl Pipeline {
             frag_bg,
             vert_bg,
             vert_uniform_buf,
+            vert_buf,
+            idx_buf,
             egui_tex,
             tex_hash: tex.id,
         }

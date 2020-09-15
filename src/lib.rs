@@ -1,17 +1,24 @@
 // #![deny(missing_docs)]
 // #![deny(missing_debug_implementations)]
 #![deny(unused_results)]
-#![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod pipeline;
 mod shaders;
 
+use bytemuck::{cast_slice, Pod, Zeroable};
 use egui::{pos2, vec2, Context, RawInput, Ui};
 use pipeline::*;
 use shaders::*;
+use std::mem::size_of;
 use std::sync::Arc;
 use wgpu::*;
+
+#[derive(Copy, Clone)]
+struct Wrap(egui::paint::Vertex);
+
+unsafe impl Zeroable for Wrap {}
+unsafe impl Pod for Wrap {}
 
 /// All events you pass to the UI state should be
 /// convertable to this type.
@@ -87,12 +94,86 @@ where
     }
 
     /// Draws the UI using `render_pass`.
-    pub fn draw_on<'a>(&'a mut self, rpass: &mut RenderPass<'a>) {
-        // render the scene
-        let mut ui = self.ctx.begin_frame(self.raw_input.take());
-        self.state.draw(&mut ui);
-        let (out, jobs) = self.ctx.end_frame();
+    pub fn draw_on(
+        &mut self,
+        mut com: CommandEncoder,
+        dev: &Device,
+        queue: &Queue,
+        frame: SwapChainFrame,
+    ) {
+        {
+            // render the scene
+            let mut ui = self.ctx.begin_frame(self.raw_input.take());
+            self.state.draw(&mut ui);
+            let (_, jobs) = self.ctx.end_frame();
+            let buffers: Vec<_> = jobs
+                .into_iter()
+                .map(|(egui::Rect { min, max }, triangles)| {
+                    let vert_buf = dev.create_buffer(&BufferDescriptor {
+                        label: Some("egui-wgpu :: vertex_buffer "),
+                        size: size_of::<egui::paint::Vertex>() as u64
+                            * triangles.vertices.len() as u64,
+                        usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
+                        mapped_at_creation: true,
+                    });
 
-        rpass.set_pipeline(&self.ui_pl.pl);
+                    let idx_buf = dev.create_buffer(&BufferDescriptor {
+                        label: Some("egui-wgpu :: index_buffer "),
+                        size: size_of::<u32>() as u64 * triangles.indices.len() as u64,
+                        usage: BufferUsage::INDEX | BufferUsage::COPY_DST,
+                        mapped_at_creation: true,
+                    });
+
+                    {
+                        let mut idx = idx_buf.slice(..).get_mapped_range_mut();
+                        idx.copy_from_slice(cast_slice(&triangles.indices));
+                    }
+                    idx_buf.unmap();
+
+                    {
+                        let mut vtx = vert_buf.slice(..).get_mapped_range_mut();
+                        let verts: Vec<_> =
+                            triangles.vertices.into_iter().map(|v| Wrap(v)).collect();
+                        vtx.copy_from_slice(cast_slice(&verts));
+                    }
+                    vert_buf.unmap();
+
+                    (
+                        vert_buf,
+                        idx_buf,
+                        triangles.indices.len(),
+                        (min.x, min.y, max.x, max.y),
+                    )
+                })
+                .collect();
+
+            let mut rpass = com.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.output.view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.,
+                            g: 0.,
+                            b: 0.,
+                            a: 0.,
+                        }),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            rpass.set_pipeline(&self.ui_pl.pl);
+            rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
+            rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
+            buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
+                rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
+                rpass.set_vertex_buffer(0, v.slice(..));
+                rpass.set_index_buffer(i.slice(..));
+                rpass.draw_indexed(0..*ct as u32, 0, 0..0);
+            });
+        }
+
+        queue.submit(Some(com.finish()));
     }
 }

@@ -103,29 +103,11 @@ fn main() {
                 swap_chain = device.create_swap_chain(&surface, &sc_desc);
             }
             Event::RedrawRequested(_) => {
-                let frame = swap_chain
-                    .get_current_frame()
-                    .expect("Swap Chain Failed")
-                    .output;
-                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                let frame = swap_chain.get_current_frame().expect("Swap Chain Failed");
+                let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("egui-wgpu :: ui encoder"),
                 });
-                {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: true,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
-                    egui_renderer.draw_on(&mut rpass);
-                }
-
-                queue.submit(Some(encoder.finish()));
+                egui_renderer.draw_on(encoder, &device, &queue, frame);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
