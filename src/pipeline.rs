@@ -158,7 +158,7 @@ impl Pipeline {
         //TODO: when desc and state are available to be put in const
         // position again do so.
         let vertex_desc = VertexBufferDescriptor {
-            attributes: &vertex_attr_array![0 => Float2, 1 => Ushort2, 2 => Uchar4],
+            attributes: &vertex_attr_array![0 => Float2, 1 => Float2, 2 => Uchar4],
             stride: std::mem::size_of::<Self>() as u64,
             step_mode: InputStepMode::Vertex,
         };

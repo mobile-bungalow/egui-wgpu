@@ -2,7 +2,7 @@ mod pipeline;
 mod shaders;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use egui::{pos2, vec2, Context, RawInput, Ui};
+use egui::{paint, pos2, vec2, Context, RawInput, Ui};
 use pipeline::*;
 use shaders::*;
 use std::mem::size_of;
@@ -10,10 +10,30 @@ use std::sync::Arc;
 use wgpu::*;
 
 #[derive(Copy, Clone)]
-struct Wrap(egui::paint::Vertex);
+#[repr(C)]
+struct V {
+    pub a_pos: [f32; 2],
+    pub a_tc: [f32; 2],
+    pub a_srgba: [u8; 4],
+}
 
-unsafe impl Zeroable for Wrap {}
-unsafe impl Pod for Wrap {}
+unsafe impl Zeroable for V {}
+unsafe impl Pod for V {}
+
+impl From<paint::Vertex> for V {
+    fn from(v: paint::Vertex) -> Self {
+        let paint::Vertex {
+            pos,
+            uv,
+            color: paint::Color { r, g, b, a },
+        } = v;
+        Self {
+            a_pos: [pos.x, pos.y],
+            a_tc: [uv.0 as f32, uv.1 as f32],
+            a_srgba: [r, g, b, a],
+        }
+    }
+}
 
 /// All events you pass to the UI state should be
 /// convertable to this type.
@@ -121,8 +141,7 @@ where
                 .map(|(egui::Rect { min, max }, triangles)| {
                     let vert_buf = dev.create_buffer(&BufferDescriptor {
                         label: Some("egui-wgpu :: vertex_buffer "),
-                        size: size_of::<egui::paint::Vertex>() as u64
-                            * triangles.vertices.len() as u64,
+                        size: size_of::<V>() as u64 * triangles.vertices.len() as u64,
                         usage: BufferUsage::VERTEX | BufferUsage::COPY_DST,
                         mapped_at_creation: true,
                     });
@@ -143,7 +162,7 @@ where
                     {
                         let mut vtx = vert_buf.slice(..).get_mapped_range_mut();
                         let verts: Vec<_> =
-                            triangles.vertices.into_iter().map(|v| Wrap(v)).collect();
+                            triangles.vertices.into_iter().map(|v| V::from(v)).collect();
                         vtx.copy_from_slice(cast_slice(&verts));
                     }
                     vert_buf.unmap();
@@ -162,7 +181,12 @@ where
                     attachment: &frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.2,
+                            g: 0.2,
+                            b: 0.2,
+                            a: 1.,
+                        }),
                         store: true,
                     },
                 }],
@@ -175,7 +199,7 @@ where
             // rpass.draw(0..3, 0..1);
 
             buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
-                //rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
+                rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
                 rpass.set_vertex_buffer(0, v.slice(..));
                 rpass.set_index_buffer(i.slice(..));
                 rpass.draw_indexed(0..*ct as u32, 0, 0..1);

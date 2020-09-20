@@ -1,5 +1,12 @@
 #version 450
 
+const mat4 WGPU_CORRECTION = mat4(
+    vec4(1., 0., 0., 0.),
+    vec4(0., 1., 0., 0.),
+    vec4(0., 0., .5, .5),
+    vec4(0., 0., 0., 1.),
+    );
+
 layout (set = 0, binding = 0) uniform Globals {
   vec2 u_screen_size;
   vec2 u_tex_size;
@@ -7,7 +14,7 @@ layout (set = 0, binding = 0) uniform Globals {
 
 layout(location = 0) in vec2 a_pos;
 layout(location = 1) in vec2 a_tc;
-layout(location = 2) in vec4 a_color;
+layout(location = 2) in uvec4 a_color;
 
 out gl_PerVertex {
   vec4 gl_Position;
@@ -17,6 +24,8 @@ layout(location = 0) out vec2 v_tc;
 layout(location = 1) out vec4 v_color;
 
 void main() {
+
+  a_pos = (vec4(a_pos, 1., 1.) * WGPU_CORRECTION).xy;
 
   gl_Position = vec4(
       2.0 * a_pos.x / u_screen_size.x - 1.0,
@@ -28,10 +37,3 @@ void main() {
   v_color = a_color / 255.0;
 }
 
-
-//void main(){
-//  vec2 position = vec2(gl_VertexIndex, (gl_VertexIndex & 1) * 2) - 1;
-//  gl_Position = vec4(position, 0.0, 1.0);
-//  v_tc = position.xy;
-//  v_color = vec4(position.xy, position.x / position.y, 1.);
-//}
