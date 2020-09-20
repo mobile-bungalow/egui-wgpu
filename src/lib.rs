@@ -170,16 +170,16 @@ where
             });
 
             rpass.set_pipeline(&self.ui_pl.pl);
-            // rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
-            rpass.set_bind_group(0, &self.ui_pl.frag_bg, &[]);
-            rpass.draw(0..3, 0..1);
+            rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
+            rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
+            // rpass.draw(0..3, 0..1);
 
-            //buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
-            //    rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
-            //    rpass.set_vertex_buffer(0, v.slice(..));
-            //    rpass.set_index_buffer(i.slice(..));
-            //    rpass.draw_indexed(0..*ct as u32, 0, 0..0);
-            //});
+            buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
+                //rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
+                rpass.set_vertex_buffer(0, v.slice(..));
+                rpass.set_index_buffer(i.slice(..));
+                rpass.draw_indexed(0..*ct as u32, 0, 0..1);
+            });
         }
 
         queue.submit(Some(com.finish()));

@@ -5,10 +5,10 @@ use crate::{default_mod, load_frag, load_vert};
 
 pub struct Pipeline {
     pub pl: RenderPipeline,
-    // pub vert_bg: BindGroup,
+    pub vert_bg: BindGroup,
     pub frag_bg: BindGroup,
     pub egui_tex: Texture,
-    // pub vert_uniform_buf: Buffer,
+    pub vert_uniform_buf: Buffer,
     pub tex_hash: u64,
 }
 
@@ -23,45 +23,45 @@ impl Pipeline {
     ) -> Self {
         // TODO: put these in const position with an updated version of the
         // layout macro
-        //  let vert_layout = dev.create_bind_group_layout(&BindGroupLayoutDescriptor {
-        //      label: Some("egui-wgpu :: vert_bind_group_layout"),
-        //      entries: &[BindGroupLayoutEntry {
-        //          visibility: ShaderStage::VERTEX,
-        //          binding: 0,
-        //          count: None,
-        //          ty: BindingType::UniformBuffer {
-        //              dynamic: false,
-        //              min_binding_size: NonZeroU64::new(size_of::<[f32; 4]>() as u64),
-        //          },
-        //      }],
-        //  });
+        let vert_layout = dev.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("egui-wgpu :: vert_bind_group_layout"),
+            entries: &[BindGroupLayoutEntry {
+                visibility: ShaderStage::VERTEX,
+                binding: 0,
+                count: None,
+                ty: BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: NonZeroU64::new(size_of::<[f32; 4]>() as u64),
+                },
+            }],
+        });
 
-        //  let vert_uniform_buf = dev.create_buffer(&BufferDescriptor {
-        //      label: Some("egui-wgpu :: vertex_uniform_buffer"),
-        //      size: size_of::<[f32; 4]>() as u64,
-        //      usage: BufferUsage::UNIFORM,
-        //      mapped_at_creation: true,
-        //  });
+        let vert_uniform_buf = dev.create_buffer(&BufferDescriptor {
+            label: Some("egui-wgpu :: vertex_uniform_buffer"),
+            size: size_of::<[f32; 4]>() as u64,
+            usage: BufferUsage::UNIFORM,
+            mapped_at_creation: true,
+        });
 
-        //  vert_uniform_buf
-        //      .slice(..)
-        //      .get_mapped_range_mut()
-        //      .copy_from_slice(bytemuck::cast_slice(&[
-        //          screen_dims.0,
-        //          screen_dims.1,
-        //          target_dims.0,
-        //          target_dims.1,
-        //      ]));
-        //  vert_uniform_buf.unmap();
+        vert_uniform_buf
+            .slice(..)
+            .get_mapped_range_mut()
+            .copy_from_slice(bytemuck::cast_slice(&[
+                screen_dims.0,
+                screen_dims.1,
+                target_dims.0,
+                target_dims.1,
+            ]));
+        vert_uniform_buf.unmap();
 
-        //  let vert_bg = dev.create_bind_group(&BindGroupDescriptor {
-        //      label: Some("egui-wgpu :: vert_bind_group"),
-        //      layout: &vert_layout,
-        //      entries: &[BindGroupEntry {
-        //          binding: 0,
-        //          resource: BindingResource::Buffer(vert_uniform_buf.slice(..)),
-        //      }],
-        //  });
+        let vert_bg = dev.create_bind_group(&BindGroupDescriptor {
+            label: Some("egui-wgpu :: vert_bind_group"),
+            layout: &vert_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::Buffer(vert_uniform_buf.slice(..)),
+            }],
+        });
 
         let frag_layout = dev.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("egui-wgpu :: frag_bind_group_layout"),
@@ -127,8 +127,7 @@ impl Pipeline {
 
         let pl_layout = dev.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("egui-wgpu :: render_pl_layout"),
-            // bind_group_layouts: &[&vert_layout, &frag_layout],
-            bind_group_layouts: &[&frag_layout],
+            bind_group_layouts: &[&vert_layout, &frag_layout],
             push_constant_ranges: &[],
         });
 
@@ -158,15 +157,15 @@ impl Pipeline {
 
         //TODO: when desc and state are available to be put in const
         // position again do so.
-        //let vertex_desc = VertexBufferDescriptor {
-        //    attributes: &vertex_attr_array![0 => Float2, 1 => Ushort2, 2 => Uchar4],
-        //    stride: std::mem::size_of::<Self>() as u64,
-        //    step_mode: InputStepMode::Vertex,
-        //};
+        let vertex_desc = VertexBufferDescriptor {
+            attributes: &vertex_attr_array![0 => Float2, 1 => Ushort2, 2 => Uchar4],
+            stride: std::mem::size_of::<Self>() as u64,
+            step_mode: InputStepMode::Vertex,
+        };
 
         let vertex_state = VertexStateDescriptor {
             index_format: IndexFormat::Uint32,
-            vertex_buffers: &[],
+            vertex_buffers: &[vertex_desc],
         };
 
         let pl = dev.create_render_pipeline(&RenderPipelineDescriptor {
@@ -187,8 +186,8 @@ impl Pipeline {
         Self {
             pl,
             frag_bg,
-            //vert_bg,
-            //vert_uniform_buf,
+            vert_bg,
+            vert_uniform_buf,
             egui_tex,
             tex_hash: tex.id,
         }
