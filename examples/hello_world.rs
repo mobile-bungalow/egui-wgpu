@@ -1,4 +1,4 @@
-use egui_wgpu::{EguiRenderer, EventBridge, UiState};
+use egui_wgpu::{EguiRenderer, EguiRendererDescriptor, EventBridge, UiState};
 use wgpu::TextureFormat;
 use winit::{
     dpi::PhysicalSize, //    window::Window,
@@ -76,7 +76,16 @@ fn main() {
     .expect("Failed to create device");
 
     let ui_state = UI;
-    let mut egui_renderer = EguiRenderer::new(&device, &queue, ui_state, FMT);
+    let mut egui_renderer = EguiRenderer::new(
+        &device,
+        &queue,
+        EguiRendererDescriptor {
+            fmt: FMT,
+            state: ui_state,
+            screen_size: window.inner_size().into(),
+            target_size: window.inner_size().into(),
+        },
+    );
     egui_renderer.set_width(size.width as f32);
     egui_renderer.set_height(size.height as f32);
 

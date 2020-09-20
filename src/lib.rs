@@ -1,8 +1,3 @@
-// #![deny(missing_docs)]
-// #![deny(missing_debug_implementations)]
-#![deny(unused_results)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
-
 mod pipeline;
 mod shaders;
 
@@ -44,16 +39,31 @@ pub struct EguiRenderer<S: UiState> {
     start_time: std::time::Instant,
 }
 
+pub struct EguiRendererDescriptor<S: UiState> {
+    pub state: S,
+    pub fmt: TextureFormat,
+    pub target_size: (f32, f32),
+    pub screen_size: (f32, f32),
+}
+
 impl<S> EguiRenderer<S>
 where
     S: UiState,
 {
     /// fmt should be the same format that you render EGui to.
-    pub fn new(dev: &Device, queue: &Queue, state: S, fmt: TextureFormat) -> Self {
+    pub fn new(dev: &Device, queue: &Queue, desc: EguiRendererDescriptor<S>) -> Self {
         let mut ctx = Context::new();
         let raw_input = RawInput::default();
         let _ = ctx.begin_frame(raw_input);
-        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt);
+
+        let EguiRendererDescriptor {
+            fmt,
+            screen_size,
+            state,
+            target_size,
+        } = desc;
+
+        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt, screen_size, target_size);
         Self {
             ui_pl,
             ctx,
@@ -152,26 +162,24 @@ where
                     attachment: &frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.,
-                            g: 0.,
-                            b: 0.,
-                            a: 0.,
-                        }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
                         store: true,
                     },
                 }],
                 depth_stencil_attachment: None,
             });
+
             rpass.set_pipeline(&self.ui_pl.pl);
-            rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
-            rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
-            buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
-                rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
-                rpass.set_vertex_buffer(0, v.slice(..));
-                rpass.set_index_buffer(i.slice(..));
-                rpass.draw_indexed(0..*ct as u32, 0, 0..0);
-            });
+            // rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
+            rpass.set_bind_group(0, &self.ui_pl.frag_bg, &[]);
+            rpass.draw(0..3, 0..1);
+
+            //buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
+            //    rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
+            //    rpass.set_vertex_buffer(0, v.slice(..));
+            //    rpass.set_index_buffer(i.slice(..));
+            //    rpass.draw_indexed(0..*ct as u32, 0, 0..0);
+            //});
         }
 
         queue.submit(Some(com.finish()));
