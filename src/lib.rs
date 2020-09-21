@@ -37,6 +37,7 @@ impl From<paint::Vertex> for V {
 
 /// All events you pass to the UI state should be
 /// convertable to this type.
+#[derive(Debug, Clone, Copy)]
 pub enum EventBridge {
     MouseMove { x: f32, y: f32 },
     MouseDown,
@@ -99,6 +100,7 @@ where
         T: Into<EventBridge>,
     {
         self.raw_input.time = self.start_time.elapsed().as_nanos() as f64 * 1e-9;
+
         match input.into() {
             EventBridge::MouseUp => self.raw_input.mouse_down = false,
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
@@ -135,7 +137,13 @@ where
             // render the scene
             let mut ui = self.ctx.begin_frame(self.raw_input.take());
             self.state.draw(&mut ui);
+
             let (_, jobs) = self.ctx.end_frame();
+
+            if self.ctx.texture().id != self.ui_pl.tex_hash {
+                self.ui_pl.rebuild_texture(&queue, self.ctx.as_ref());
+            }
+
             let buffers: Vec<_> = jobs
                 .into_iter()
                 .map(|(egui::Rect { min, max }, triangles)| {
@@ -161,8 +169,7 @@ where
 
                     {
                         let mut vtx = vert_buf.slice(..).get_mapped_range_mut();
-                        let verts: Vec<_> =
-                            triangles.vertices.into_iter().map(|v| V::from(v)).collect();
+                        let verts: Vec<_> = triangles.vertices.into_iter().map(V::from).collect();
                         vtx.copy_from_slice(cast_slice(&verts));
                     }
                     vert_buf.unmap();
@@ -183,8 +190,8 @@ where
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.2,
-                            g: 0.2,
-                            b: 0.2,
+                            g: 0.15,
+                            b: 0.14,
                             a: 1.,
                         }),
                         store: true,
@@ -196,7 +203,6 @@ where
             rpass.set_pipeline(&self.ui_pl.pl);
             rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
             rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
-            // rpass.draw(0..3, 0..1);
 
             buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
                 rpass.set_viewport(*x, *y, *w, *h, 1., 0.);

@@ -10,6 +10,6 @@ layout(location = 0) out vec4 o_color;
 
 void main() {
   o_color = v_color;
-  o_color.a *= texture(sampler2D(u_tex, u_sampler), v_tc.xy).g;
+  o_color.a *= texture(sampler2D(u_tex, u_sampler), v_tc.xy).r;
 }
 

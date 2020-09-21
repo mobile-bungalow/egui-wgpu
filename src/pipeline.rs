@@ -95,7 +95,7 @@ impl Pipeline {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Uint,
+            format: TextureFormat::R8Uint,
             usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
         });
 
@@ -131,21 +131,16 @@ impl Pipeline {
             push_constant_ranges: &[],
         });
 
-        let pixels = tex.pixels.iter().fold(Vec::<u8>::new(), |mut vec, byte| {
-            vec.extend(&[*byte; 4]);
-            vec
-        });
-
         q.write_texture(
             wgpu::TextureCopyView {
                 texture: &egui_tex,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
             },
-            &pixels,
+            &tex.pixels,
             wgpu::TextureDataLayout {
                 offset: 0,
-                bytes_per_row: tex.width as u32 * 4,
+                bytes_per_row: tex.width as u32,
                 rows_per_image: tex.height as u32,
             },
             wgpu::Extent3d {
@@ -159,7 +154,7 @@ impl Pipeline {
         // position again do so.
         let vertex_desc = VertexBufferDescriptor {
             attributes: &vertex_attr_array![0 => Float2, 1 => Float2, 2 => Uchar4],
-            stride: std::mem::size_of::<Self>() as u64,
+            stride: std::mem::size_of::<crate::V>() as u64,
             step_mode: InputStepMode::Vertex,
         };
 
@@ -193,24 +188,26 @@ impl Pipeline {
         }
     }
 
-    pub fn rebuild_texture(&mut self, queue: &Queue, tex: &egui::paint::Texture) {
-        //queue.write_texture(
-        //    wgpu::TextureCopyView {
-        //        texture: &self.egui_tex,
-        //        mip_level: 0,
-        //        origin: wgpu::Origin3d::ZERO,
-        //    },
-        //    &tex.pixels,
-        //    wgpu::TextureDataLayout {
-        //        offset: 0,
-        //        bytes_per_row: tex.width as u32 * 4,
-        //        rows_per_image: tex.height as u32,
-        //    },
-        //    wgpu::Extent3d {
-        //        width: tex.width as u32,
-        //        height: tex.height as u32,
-        //        depth: 1,
-        //    },
-        //);
+    pub fn rebuild_texture(&mut self, queue: &Queue, ctx: &egui::Context) {
+        let tex = ctx.texture();
+        self.tex_hash = tex.id;
+        queue.write_texture(
+            wgpu::TextureCopyView {
+                texture: &self.egui_tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            &tex.pixels,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: tex.width as u32,
+                rows_per_image: tex.height as u32,
+            },
+            wgpu::Extent3d {
+                width: tex.width as u32,
+                height: tex.height as u32,
+                depth: 1,
+            },
+        );
     }
 }

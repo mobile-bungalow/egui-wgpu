@@ -106,10 +106,11 @@ fn main() {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                // Recreate the swap chain with the new size
                 sc_desc.width = size.width;
                 sc_desc.height = size.height;
                 swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                egui_renderer.set_height(size.height as f32);
+                egui_renderer.set_width(size.width as f32);
             }
             Event::RedrawRequested(_) => {
                 let frame = swap_chain.get_current_frame().expect("Swap Chain Failed");
