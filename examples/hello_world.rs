@@ -40,12 +40,16 @@ struct UI;
 
 impl UiState for UI {
     fn draw(&self, ui: &mut egui::Ui) {
-        ui.add(egui::Label::new("Egui on WGPU").text_style(egui::TextStyle::Heading));
-        ui.separator();
-        ui.label("Oh Yes!");
-        if ui.button("Quit").clicked {
-            std::process::exit(0);
-        }
+        egui::Window::new("Debug")
+            .default_size(egui::vec2(200.0, 100.0))
+            .show(ui.ctx(), |ui| {
+                ui.add(egui::Label::new("Egui on WGPU").text_style(egui::TextStyle::Heading));
+                ui.separator();
+                ui.label("Oh Yes!");
+                if ui.button("Quit").clicked {
+                    std::process::exit(0);
+                }
+            });
     }
 }
 

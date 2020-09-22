@@ -101,6 +101,7 @@ impl Pipeline {
 
         let egui_sampler = dev.create_sampler(&SamplerDescriptor {
             label: Some("egui-wgpu :: main_sampler"),
+            min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
 
@@ -163,6 +164,16 @@ impl Pipeline {
             vertex_buffers: &[vertex_desc],
         };
 
+        let color_state = ColorStateDescriptor {
+            format: fmt,
+            alpha_blend: BlendDescriptor {
+                src_factor: BlendFactor::One,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                ..Default::default()
+            },
+            ..fmt.into()
+        };
+
         let pl = dev.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("egui-wgpu :: render_pl"),
             layout: Some(&pl_layout),
@@ -170,7 +181,7 @@ impl Pipeline {
             fragment_stage: Some(default_mod(&load_frag(&dev))),
             rasterization_state: None,
             primitive_topology: PrimitiveTopology::TriangleList,
-            color_states: &[fmt.into()],
+            color_states: &[color_state],
             depth_stencil_state: None,
             vertex_state,
             sample_count: 1,

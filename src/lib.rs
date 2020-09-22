@@ -74,8 +74,11 @@ where
     /// fmt should be the same format that you render EGui to.
     pub fn new(dev: &Device, queue: &Queue, desc: EguiRendererDescriptor<S>) -> Self {
         let mut ctx = Context::new();
-        let raw_input = RawInput::default();
-        let _ = ctx.begin_frame(raw_input);
+        let raw_input = RawInput {
+            pixels_per_point: Some(2.),
+            ..Default::default()
+        };
+        let _ = ctx.begin_frame(raw_input.clone());
 
         let EguiRendererDescriptor {
             fmt,
@@ -89,7 +92,7 @@ where
             ui_pl,
             ctx,
             state,
-            raw_input: RawInput::default(),
+            raw_input,
             start_time: std::time::Instant::now(),
         }
     }
@@ -100,11 +103,14 @@ where
         T: Into<EventBridge>,
     {
         self.raw_input.time = self.start_time.elapsed().as_nanos() as f64 * 1e-9;
+        let p3 = self.raw_input.pixels_per_point.unwrap();
 
         match input.into() {
             EventBridge::MouseUp => self.raw_input.mouse_down = false,
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
-            EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x, y)),
+            EventBridge::MouseMove { x, y } => {
+                self.raw_input.mouse_pos = Some(pos2(x / p3, y / p3))
+            }
             EventBridge::Resize { w, h } => self.raw_input.screen_size = vec2(w, h),
             EventBridge::DpiChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
             _ => {}
@@ -188,13 +194,8 @@ where
                     attachment: &frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.2,
-                            g: 0.15,
-                            b: 0.14,
-                            a: 1.,
-                        }),
-                        store: true,
+                        load: wgpu::LoadOp::Load,
+                        store: false,
                     },
                 }],
                 depth_stencil_attachment: None,
@@ -205,7 +206,7 @@ where
             rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
 
             buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
-                rpass.set_viewport(*x, *y, *w, *h, 1., 0.);
+                rpass.set_scissor_rect(*x as u32, *y as u32, *w as u32, *h as u32);
                 rpass.set_vertex_buffer(0, v.slice(..));
                 rpass.set_index_buffer(i.slice(..));
                 rpass.draw_indexed(0..*ct as u32, 0, 0..1);
