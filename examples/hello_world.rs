@@ -37,7 +37,7 @@ impl<'a, 'b> Into<EventBridge> for EventWrapper<'a, 'b> {
                     ElementState::Released => EventBridge::MouseUp,
                 },
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                    EventBridge::DpiChanged(*scale_factor as f32)
+                    EventBridge::PppChanged(*scale_factor as f32)
                 }
                 _ => EventBridge::Ignore,
             },
@@ -99,6 +99,7 @@ fn main() {
             state: ui_state,
             screen_size: window.inner_size().into(),
             target_size: window.inner_size().into(),
+            ppp:  window.scale_factor() as f32,
         },
     );
 

@@ -25,7 +25,7 @@ impl From<paint::Vertex> for V {
         let paint::Vertex {
             pos,
             uv,
-            color: paint::Color { r, g, b, a },
+            color: paint::color::Srgba([r, g, b, a]),
         } = v;
         Self {
             a_pos: [pos.x, pos.y],
@@ -44,7 +44,7 @@ pub enum EventBridge {
     MouseUp,
     Scroll { x: f32, y: f32 },
     Resize { w: f32, h: f32 },
-    DpiChanged(f32),
+    PppChanged(f32),
     Ignore,
 }
 
@@ -66,6 +66,7 @@ pub struct EguiRendererDescriptor<S: UiState> {
     pub fmt: TextureFormat,
     pub target_size: (f32, f32),
     pub screen_size: (f32, f32),
+    pub ppp: f32,
 }
 
 impl<S> EguiRenderer<S>
@@ -74,21 +75,26 @@ where
 {
     /// fmt should be the same format that you render EGui to.
     pub fn new(dev: &Device, queue: &Queue, desc: EguiRendererDescriptor<S>) -> Self {
-        let mut ctx = Context::new();
-        let raw_input = RawInput {
-            pixels_per_point: Some(2.),
-            ..Default::default()
-        };
-        let _ = ctx.begin_frame(raw_input.clone());
 
         let EguiRendererDescriptor {
             fmt,
             screen_size,
             state,
             target_size,
+            ppp,
         } = desc;
 
-        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt, screen_size, target_size);
+        let mut ctx = Context::new();
+        let raw_input = RawInput {
+            pixels_per_point: Some(ppp),
+            ..Default::default()
+        };
+        let _ = ctx.begin_frame(raw_input.clone());
+
+        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt, 
+            (screen_size.0 / ppp, screen_size.1 / ppp), 
+            (target_size.0 / ppp, target_size.1 / ppp));
+
         Self {
             ui_pl,
             ctx,
@@ -104,14 +110,15 @@ where
         T: Into<EventBridge>,
     {
         self.raw_input.time = self.start_time.elapsed().as_nanos() as f64 * 1e-9;
+        let ppp = self.raw_input.pixels_per_point.unwrap_or(1.);
 
         match input.into() {
             EventBridge::MouseUp => self.raw_input.mouse_down = false,
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
             EventBridge::Scroll { x, y } => self.raw_input.scroll_delta = vec2(x, y),
-            EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x, y)),
+            EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x / ppp, y / ppp)),
             EventBridge::Resize { w, h } => self.raw_input.screen_size = vec2(w, h),
-            EventBridge::DpiChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
+            EventBridge::PppChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
             _ => {}
         }
     }
@@ -183,8 +190,8 @@ where
                     attachment: &frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: false,
+                        load: wgpu::LoadOp::Clear(Color::BLACK),
+                        store: true,
                     },
                 }],
                 depth_stencil_attachment: None,

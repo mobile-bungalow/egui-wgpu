@@ -166,9 +166,14 @@ impl Pipeline {
 
         let color_state = ColorStateDescriptor {
             format: fmt,
-            alpha_blend: BlendDescriptor {
+            color_blend: BlendDescriptor {
                 src_factor: BlendFactor::One,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
+                ..Default::default()
+            },
+            alpha_blend: BlendDescriptor {
+                src_factor: BlendFactor::OneMinusDstAlpha,
+                dst_factor: BlendFactor::One,
                 ..Default::default()
             },
             ..fmt.into()
