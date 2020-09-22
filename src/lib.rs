@@ -16,7 +16,6 @@ struct V {
     pub a_tc: [f32; 2],
     pub a_srgba: [u8; 4],
 }
-
 unsafe impl Zeroable for V {}
 unsafe impl Pod for V {}
 
@@ -84,15 +83,17 @@ where
             ppp,
         } = desc;
 
+
         let mut ctx = Context::new();
         let raw_input = RawInput {
             pixels_per_point: Some(ppp),
+            screen_size: vec2(screen_size.0 / ppp, screen_size.1 / ppp),
             ..Default::default()
         };
         let _ = ctx.begin_frame(raw_input.clone());
 
         let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt, 
-            (screen_size.0 / ppp, screen_size.1 / ppp), 
+            (screen_size.0 / ppp, screen_size.1 / ppp),
             (target_size.0 / ppp, target_size.1 / ppp));
 
         Self {
@@ -197,12 +198,13 @@ where
                 depth_stencil_attachment: None,
             });
 
+            let ppp = self.raw_input.pixels_per_point.unwrap();
             rpass.set_pipeline(&self.ui_pl.pl);
             rpass.set_bind_group(0, &self.ui_pl.vert_bg, &[]);
             rpass.set_bind_group(1, &self.ui_pl.frag_bg, &[]);
 
             buffers.iter().for_each(|(v, i, ct, (x, y, w, h))| {
-                rpass.set_scissor_rect(*x as u32, *y as u32, *w as u32, *h as u32);
+                rpass.set_scissor_rect(*x as u32, *y as u32, (w * ppp) as u32, (h * ppp) as u32);
                 rpass.set_vertex_buffer(0, v.slice(..));
                 rpass.set_index_buffer(i.slice(..));
                 rpass.draw_indexed(0..*ct as u32, 0, 0..1);
