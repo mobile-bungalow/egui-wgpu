@@ -42,6 +42,7 @@ pub enum EventBridge {
     MouseMove { x: f32, y: f32 },
     MouseDown,
     MouseUp,
+    Scroll { x: f32, y: f32 },
     Resize { w: f32, h: f32 },
     DpiChanged(f32),
     Ignore,
@@ -103,31 +104,19 @@ where
         T: Into<EventBridge>,
     {
         self.raw_input.time = self.start_time.elapsed().as_nanos() as f64 * 1e-9;
-        let p3 = self.raw_input.pixels_per_point.unwrap();
 
         match input.into() {
             EventBridge::MouseUp => self.raw_input.mouse_down = false,
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
-            EventBridge::MouseMove { x, y } => {
-                self.raw_input.mouse_pos = Some(pos2(x / p3, y / p3))
-            }
+            EventBridge::Scroll { x, y } => self.raw_input.scroll_delta = vec2(x, y),
+            EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x, y)),
             EventBridge::Resize { w, h } => self.raw_input.screen_size = vec2(w, h),
             EventBridge::DpiChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
             _ => {}
         }
     }
 
-    pub fn set_height(&mut self, h: f32) {
-        self.raw_input.screen_size.y = h;
-        //TODO: set texture height in buffer
-    }
-
-    pub fn set_width(&mut self, w: f32) {
-        self.raw_input.screen_size.x = w;
-        //TODO: set texutre width in buffer
-    }
-
-    pub fn dpi(&mut self, dpi: f32) {
+    pub fn set_dpi(&mut self, dpi: f32) {
         self.raw_input.pixels_per_point = Some(dpi);
     }
 

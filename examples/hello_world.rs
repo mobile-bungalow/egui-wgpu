@@ -21,6 +21,17 @@ impl<'a, 'b> Into<EventBridge> for EventWrapper<'a, 'b> {
                     x: p.x as f32,
                     y: p.y as f32,
                 },
+                WindowEvent::MouseWheel {
+                    delta: winit::event::MouseScrollDelta::LineDelta(x, y),
+                    ..
+                } => EventBridge::Scroll { x: *x, y: *y },
+                WindowEvent::MouseWheel {
+                    delta: winit::event::MouseScrollDelta::PixelDelta(pos),
+                    ..
+                } => EventBridge::Scroll {
+                    x: pos.x as f32,
+                    y: pos.y as f32,
+                },
                 WindowEvent::MouseInput { state, .. } => match state {
                     ElementState::Pressed => EventBridge::MouseDown,
                     ElementState::Released => EventBridge::MouseUp,
@@ -90,8 +101,6 @@ fn main() {
             target_size: window.inner_size().into(),
         },
     );
-    egui_renderer.set_width(size.width as f32);
-    egui_renderer.set_height(size.height as f32);
 
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -113,10 +122,9 @@ fn main() {
                 sc_desc.width = size.width;
                 sc_desc.height = size.height;
                 swap_chain = device.create_swap_chain(&surface, &sc_desc);
-                egui_renderer.set_height(size.height as f32);
-                egui_renderer.set_width(size.width as f32);
             }
-            Event::RedrawRequested(_) => {
+            // This is lazy and bad do not cargo cult it.
+            Event::MainEventsCleared => {
                 let frame = swap_chain.get_current_frame().expect("Swap Chain Failed");
                 let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("egui-wgpu :: ui encoder"),
