@@ -19,7 +19,6 @@ impl Pipeline {
         tex: &egui::paint::Texture,
         fmt: TextureFormat,
         screen_dims: (f32, f32),
-        target_dims: (f32, f32),
     ) -> Self {
         // TODO: put these in const position with an updated version of the
         // layout macro
@@ -49,8 +48,8 @@ impl Pipeline {
             .copy_from_slice(bytemuck::cast_slice(&[
                 screen_dims.0,
                 screen_dims.1,
-                target_dims.0,
-                target_dims.1,
+                tex.width as f32,
+                tex.height as f32,
             ]));
         vert_uniform_buf.unmap();
 
@@ -95,9 +94,33 @@ impl Pipeline {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::R8Uint,
+            format: TextureFormat::Rgba8UnormSrgb,
             usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
         });
+
+        let pixels = tex.pixels.iter().fold(Vec::<u8>::new(), |mut acc, b| {
+            acc.extend(&[*b; 4]);
+            acc
+        });
+
+        q.write_texture(
+            wgpu::TextureCopyView {
+                texture: &egui_tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            &pixels,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: tex.width as u32 * 4,
+                rows_per_image: tex.height as u32,
+            },
+            wgpu::Extent3d {
+                width: tex.width as u32,
+                height: tex.height as u32,
+                depth: 1,
+            },
+        );
 
         let egui_sampler = dev.create_sampler(&SamplerDescriptor {
             label: Some("egui-wgpu :: main_sampler"),
@@ -118,6 +141,7 @@ impl Pipeline {
                     resource: BindingResource::TextureView(&egui_tex.create_view(
                         &TextureViewDescriptor {
                             label: Some("egui-wgpu :: main_texture_view"),
+                            format: Some(TextureFormat::Rgba8UnormSrgb),
                             dimension: Some(TextureViewDimension::D2),
                             ..Default::default()
                         },
@@ -131,25 +155,6 @@ impl Pipeline {
             bind_group_layouts: &[&vert_layout, &frag_layout],
             push_constant_ranges: &[],
         });
-
-        q.write_texture(
-            wgpu::TextureCopyView {
-                texture: &egui_tex,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            &tex.pixels,
-            wgpu::TextureDataLayout {
-                offset: 0,
-                bytes_per_row: tex.width as u32,
-                rows_per_image: tex.height as u32,
-            },
-            wgpu::Extent3d {
-                width: tex.width as u32,
-                height: tex.height as u32,
-                depth: 1,
-            },
-        );
 
         //TODO: when desc and state are available to be put in const
         // position again do so.
@@ -204,9 +209,7 @@ impl Pipeline {
         }
     }
 
-    pub fn resize(&mut self, w: f32, h: f32) {
-
-    }
+    pub fn resize(&mut self, w: f32, h: f32) {}
 
     pub fn rebuild_texture(&mut self, queue: &Queue, ctx: &egui::Context) {
         let tex = ctx.texture();

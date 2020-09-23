@@ -63,7 +63,6 @@ pub struct EguiRenderer<S: UiState> {
 pub struct EguiRendererDescriptor<S: UiState> {
     pub state: S,
     pub fmt: TextureFormat,
-    pub target_size: (f32, f32),
     pub screen_size: (f32, f32),
     pub ppp: f32,
 }
@@ -74,15 +73,12 @@ where
 {
     /// fmt should be the same format that you render EGui to.
     pub fn new(dev: &Device, queue: &Queue, desc: EguiRendererDescriptor<S>) -> Self {
-
         let EguiRendererDescriptor {
             fmt,
             screen_size,
             state,
-            target_size,
             ppp,
         } = desc;
-
 
         let mut ctx = Context::new();
         let raw_input = RawInput {
@@ -92,9 +88,13 @@ where
         };
         let _ = ctx.begin_frame(raw_input.clone());
 
-        let ui_pl = Pipeline::new(dev, queue, ctx.texture(), fmt, 
+        let ui_pl = Pipeline::new(
+            dev,
+            queue,
+            ctx.texture(),
+            fmt,
             (screen_size.0 / ppp, screen_size.1 / ppp),
-            (target_size.0 / ppp, target_size.1 / ppp));
+        );
 
         Self {
             ui_pl,
@@ -117,8 +117,13 @@ where
             EventBridge::MouseUp => self.raw_input.mouse_down = false,
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
             EventBridge::Scroll { x, y } => self.raw_input.scroll_delta = vec2(x, y),
-            EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x / ppp, y / ppp)),
-            EventBridge::Resize { w, h } => { self.raw_input.screen_size = vec2(w, h); self.ui_pl.resize(w,h); },
+            EventBridge::MouseMove { x, y } => {
+                self.raw_input.mouse_pos = Some(pos2(x / ppp, y / ppp))
+            }
+            EventBridge::Resize { w, h } => {
+                self.raw_input.screen_size = vec2(w, h);
+                self.ui_pl.resize(w, h);
+            }
             EventBridge::PppChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
             _ => {}
         }

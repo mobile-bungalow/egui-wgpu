@@ -98,8 +98,7 @@ fn main() {
             fmt: FMT,
             state: ui_state,
             screen_size: window.inner_size().into(),
-            target_size: window.inner_size().into(),
-            ppp:  window.scale_factor() as f32,
+            ppp: window.scale_factor() as f32,
         },
     );
 
