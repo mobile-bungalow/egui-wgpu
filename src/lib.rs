@@ -118,7 +118,7 @@ where
             EventBridge::MouseDown => self.raw_input.mouse_down = true,
             EventBridge::Scroll { x, y } => self.raw_input.scroll_delta = vec2(x, y),
             EventBridge::MouseMove { x, y } => self.raw_input.mouse_pos = Some(pos2(x / ppp, y / ppp)),
-            EventBridge::Resize { w, h } => self.raw_input.screen_size = vec2(w, h),
+            EventBridge::Resize { w, h } => { self.raw_input.screen_size = vec2(w, h); self.ui_pl.resize(w,h); },
             EventBridge::PppChanged(dpi) => self.raw_input.pixels_per_point = Some(dpi),
             _ => {}
         }
