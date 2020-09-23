@@ -204,6 +204,10 @@ impl Pipeline {
         }
     }
 
+    pub fn resize(&mut self, w: f32, h: f32) {
+
+    }
+
     pub fn rebuild_texture(&mut self, queue: &Queue, ctx: &egui::Context) {
         let tex = ctx.texture();
         self.tex_hash = tex.id;
